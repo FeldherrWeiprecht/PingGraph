@@ -41,6 +41,27 @@ int read_hosts(char *hosts[], int max_hosts)
     return host_count;
 }
 
+void ping_hosts(char *hosts[], int count)
+{
+    char command[MAX_LENGTH + 20];
+
+    printf("\nPinging hosts:\n\n");
+
+    for (int i = 0; i < count; i++) {
+        printf("Pinging %s...\n", hosts[i]);
+
+        snprintf(command, sizeof(command), "ping -c 1 %s > /dev/null", hosts[i]);
+
+        int result = system(command);
+
+        if (result == 0) {
+            printf("Host %s is reachable.\n\n", hosts[i]);
+        } else {
+            printf("Host %s is unreachable.\n\n", hosts[i]);
+        }
+    }
+}
+
 int main()
 {
     char *hosts[MAX_HOSTS];
@@ -50,10 +71,7 @@ int main()
         return 1;
     }
 
-    printf("\nEntered hosts:\n\n");
-    for (int i = 0; i < host_count; i++) {
-        printf("Host %d: %s\n", i + 1, hosts[i]);
-    }
+    ping_hosts(hosts, host_count);
 
     for (int i = 0; i < host_count; i++) {
         free(hosts[i]);
