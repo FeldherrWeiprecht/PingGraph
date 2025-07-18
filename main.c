@@ -4,6 +4,7 @@
 
 #define MAX_HOSTS 100
 #define MAX_LENGTH 256
+#define MAX_BAR_WIDTH 50
 
 int read_hosts(char *hosts[], int max_hosts)
 {
@@ -67,20 +68,45 @@ float get_ping_latency(const char *host)
     return latency;
 }
 
+void draw_bar(float latency)
+{
+    int width = 0;
+
+    if (latency > 0.0) {
+        if (latency >= MAX_BAR_WIDTH) {
+            width = MAX_BAR_WIDTH;
+        } else {
+            width = (int)latency;
+        }
+    }
+
+    for (int i = 0; i < width; i++) {
+        printf("#");
+    }
+
+    for (int i = width; i < MAX_BAR_WIDTH; i++) {
+        printf(" ");
+    }
+}
+
 void ping_hosts(char *hosts[], int count)
 {
     printf("\nPinging hosts:\n\n");
 
     for (int i = 0; i < count; i++) {
-        printf("Pinging %s... ", hosts[i]);
-
         float latency = get_ping_latency(hosts[i]);
 
+        printf("%-20s ", hosts[i]);
+
+        draw_bar(latency);
+
         if (latency >= 0.0) {
-            printf("Response time: %.2f ms\n", latency);
+            printf("  %.2f ms", latency);
         } else {
-            printf("No response (timeout)\n");
+            printf("  timeout");
         }
+
+        printf("\n");
     }
 
     printf("\n");
