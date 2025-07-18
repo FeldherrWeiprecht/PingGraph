@@ -41,25 +41,49 @@ int read_hosts(char *hosts[], int max_hosts)
     return host_count;
 }
 
+float get_ping_latency(const char *host)
+{
+    char command[MAX_LENGTH + 32];
+    snprintf(command, sizeof(command), "ping -c 1 %s", host);
+
+    FILE *fp = popen(command, "r");
+    if (fp == NULL) {
+        return -1.0;
+    }
+
+    char line[512];
+    float latency = -1.0;
+
+    while (fgets(line, sizeof(line), fp) != NULL) {
+        if (strstr(line, "time=") != NULL) {
+            char *ptr = strstr(line, "time=");
+            if (ptr != NULL) {
+                sscanf(ptr, "time=%f", &latency);
+            }
+        }
+    }
+
+    pclose(fp);
+    return latency;
+}
+
 void ping_hosts(char *hosts[], int count)
 {
-    char command[MAX_LENGTH + 20];
-
     printf("\nPinging hosts:\n\n");
 
     for (int i = 0; i < count; i++) {
-        printf("Pinging %s...\n", hosts[i]);
+        printf("Pinging %s... ", hosts[i]);
 
-        snprintf(command, sizeof(command), "ping -c 1 %s > /dev/null", hosts[i]);
+        float latency = get_ping_latency(hosts[i]);
 
-        int result = system(command);
-
-        if (result == 0) {
-            printf("Host %s is reachable.\n\n", hosts[i]);
+        if (latency >= 0.0) {
+            printf("Response time: %.2f ms\n", latency);
         } else {
-            printf("Host %s is unreachable.\n\n", hosts[i]);
+            printf("No response (timeout)\n");
         }
     }
+
+    printf("\n");
 }
 
 int main()
