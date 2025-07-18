@@ -45,9 +45,15 @@ int read_hosts(char *hosts[], int max_hosts)
 float get_ping_latency(const char *host)
 {
     char command[MAX_LENGTH + 32];
-    snprintf(command, sizeof(command), "ping -c 1 %s", host);
 
+#ifdef _WIN32
+    snprintf(command, sizeof(command), "ping -n 1 %s", host);
+    FILE *fp = _popen(command, "r");
+#else
+    snprintf(command, sizeof(command), "ping -c 1 %s", host);
     FILE *fp = popen(command, "r");
+#endif
+
     if (fp == NULL) {
         return -1.0;
     }
@@ -56,15 +62,25 @@ float get_ping_latency(const char *host)
     float latency = -1.0;
 
     while (fgets(line, sizeof(line), fp) != NULL) {
+        char *ptr = NULL;
+
         if (strstr(line, "time=") != NULL) {
-            char *ptr = strstr(line, "time=");
-            if (ptr != NULL) {
-                sscanf(ptr, "time=%f", &latency);
-            }
+            ptr = strstr(line, "time=");
+        } else if (strstr(line, "Zeit=") != NULL) {
+            ptr = strstr(line, "Zeit=");
+        }
+
+        if (ptr != NULL) {
+            sscanf(ptr, "%*[^=]=%f", &latency);
         }
     }
 
+#ifdef _WIN32
+    _pclose(fp);
+#else
     pclose(fp);
+#endif
+
     return latency;
 }
 
