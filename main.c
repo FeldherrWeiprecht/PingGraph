@@ -12,7 +12,7 @@
 #define MAX_HOSTS 100
 #define MAX_LENGTH 256
 #define MAX_BAR_WIDTH 50
-#define INTERVAL_SECONDS 3
+#define DEFAULT_INTERVAL 3
 #define LOG_FILENAME "pinggraph.log"
 
 typedef struct
@@ -217,8 +217,41 @@ void wait_seconds(int seconds)
 #endif
 }
 
-int main()
+int parse_args(int argc, char *argv[], int *interval, int *run_once)
 {
+    *interval = DEFAULT_INTERVAL;
+    *run_once = 0;
+
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--interval") == 0 && i + 1 < argc) {
+            *interval = atoi(argv[i + 1]);
+            if (*interval <= 0) {
+                *interval = DEFAULT_INTERVAL;
+            }
+            i++;
+        } else if (strcmp(argv[i], "--once") == 0) {
+            *run_once = 1;
+        } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
+            printf("PingGraph - Network Latency Monitor\n\n");
+            printf("Usage: pinggraph.exe [options]\n\n");
+            printf("Options:\n");
+            printf("  --interval N   Ping every N seconds (default: 3)\n");
+            printf("  --once         Run one single ping round and exit\n");
+            printf("  --help, -h     Show this help message\n\n");
+            exit(0);
+        }
+    }
+
+    return 0;
+}
+
+int main(int argc, char *argv[])
+{
+    int interval = 0;
+    int run_once = 0;
+
+    parse_args(argc, argv, &interval, &run_once);
+
     char *hosts[MAX_HOSTS];
     latency_stat stats[MAX_HOSTS] = {0};
     int host_count = read_hosts(hosts, MAX_HOSTS);
@@ -233,9 +266,13 @@ int main()
         return 1;
     }
 
-    while (1) {
+    if (run_once) {
         ping_hosts(hosts, host_count, stats, log_file);
-        wait_seconds(INTERVAL_SECONDS);
+    } else {
+        while (1) {
+            ping_hosts(hosts, host_count, stats, log_file);
+            wait_seconds(interval);
+        }
     }
 
     for (int i = 0; i < host_count; i++) {
