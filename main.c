@@ -21,6 +21,7 @@ typedef struct
     float sum;
     float min;
     float max;
+    int timeout_count;
 } latency_stat;
 
 int load_hosts_from_file(const char *filename, char *hosts[], int max_hosts)
@@ -36,17 +37,14 @@ int load_hosts_from_file(const char *filename, char *hosts[], int max_hosts)
 
     while (fgets(buffer, sizeof(buffer), file) != NULL && count < max_hosts) {
         buffer[strcspn(buffer, "\n")] = '\0';
-
         if (strlen(buffer) == 0) {
             continue;
         }
-
         hosts[count] = malloc(strlen(buffer) + 1);
         if (hosts[count] == NULL) {
             fclose(file);
             return 0;
         }
-
         strcpy(hosts[count], buffer);
         count++;
     }
@@ -212,6 +210,8 @@ void ping_hosts(char *hosts[], int count, latency_stat stats[], FILE *log_file)
             if (latencies[i] > stats[i].max) {
                 stats[i].max = latencies[i];
             }
+        } else {
+            stats[i].timeout_count += 1;
         }
     }
 
@@ -249,11 +249,12 @@ void wait_seconds(int seconds)
 #endif
 }
 
-int parse_args(int argc, char *argv[], int *interval, int *run_once, char **host_file)
+int parse_args(int argc, char *argv[], int *interval, int *run_once, char **host_file, int *log_append)
 {
     *interval = DEFAULT_INTERVAL;
     *run_once = 0;
     *host_file = NULL;
+    *log_append = 0;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--interval") == 0 && i + 1 < argc) {
@@ -267,14 +268,17 @@ int parse_args(int argc, char *argv[], int *interval, int *run_once, char **host
         } else if (strcmp(argv[i], "--hosts") == 0 && i + 1 < argc) {
             *host_file = argv[i + 1];
             i++;
+        } else if (strcmp(argv[i], "--log-append") == 0) {
+            *log_append = 1;
         } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             printf("PingGraph - Network Latency Monitor\n\n");
             printf("Usage: pinggraph.exe [options]\n\n");
             printf("Options:\n");
-            printf("  --interval N   Ping every N seconds (default: 3)\n");
-            printf("  --once         Run one single ping round and exit\n");
-            printf("  --hosts FILE   Load hosts from text file\n");
-            printf("  --help, -h     Show this help message\n\n");
+            printf("  --interval N     Ping every N seconds (default: 3)\n");
+            printf("  --once           Run one single ping round and exit\n");
+            printf("  --hosts FILE     Load hosts from text file\n");
+            printf("  --log-append     Append to existing log file instead of overwriting\n");
+            printf("  --help, -h       Show this help message\n\n");
             exit(0);
         }
     }
@@ -286,9 +290,10 @@ int main(int argc, char *argv[])
 {
     int interval = 0;
     int run_once = 0;
+    int log_append = 0;
     char *host_file = NULL;
 
-    parse_args(argc, argv, &interval, &run_once, &host_file);
+    parse_args(argc, argv, &interval, &run_once, &host_file, &log_append);
 
     char *hosts[MAX_HOSTS];
     latency_stat stats[MAX_HOSTS] = {0};
@@ -304,7 +309,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    FILE *log_file = fopen(LOG_FILENAME, "w");
+    FILE *log_file = fopen(LOG_FILENAME, log_append ? "a" : "w");
     if (log_file == NULL) {
         printf("Failed to open log file.\n");
         return 1;
