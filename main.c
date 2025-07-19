@@ -23,7 +23,39 @@ typedef struct
     float max;
 } latency_stat;
 
-int read_hosts(char *hosts[], int max_hosts)
+int load_hosts_from_file(const char *filename, char *hosts[], int max_hosts)
+{
+    FILE *file = fopen(filename, "r");
+    if (file == NULL) {
+        printf("Failed to open host file: %s\n", filename);
+        return 0;
+    }
+
+    int count = 0;
+    char buffer[MAX_LENGTH];
+
+    while (fgets(buffer, sizeof(buffer), file) != NULL && count < max_hosts) {
+        buffer[strcspn(buffer, "\n")] = '\0';
+
+        if (strlen(buffer) == 0) {
+            continue;
+        }
+
+        hosts[count] = malloc(strlen(buffer) + 1);
+        if (hosts[count] == NULL) {
+            fclose(file);
+            return 0;
+        }
+
+        strcpy(hosts[count], buffer);
+        count++;
+    }
+
+    fclose(file);
+    return count;
+}
+
+int read_hosts_interactive(char *hosts[], int max_hosts)
 {
     int host_count = 0;
     char buffer[MAX_LENGTH];
@@ -217,10 +249,11 @@ void wait_seconds(int seconds)
 #endif
 }
 
-int parse_args(int argc, char *argv[], int *interval, int *run_once)
+int parse_args(int argc, char *argv[], int *interval, int *run_once, char **host_file)
 {
     *interval = DEFAULT_INTERVAL;
     *run_once = 0;
+    *host_file = NULL;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--interval") == 0 && i + 1 < argc) {
@@ -231,12 +264,16 @@ int parse_args(int argc, char *argv[], int *interval, int *run_once)
             i++;
         } else if (strcmp(argv[i], "--once") == 0) {
             *run_once = 1;
+        } else if (strcmp(argv[i], "--hosts") == 0 && i + 1 < argc) {
+            *host_file = argv[i + 1];
+            i++;
         } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             printf("PingGraph - Network Latency Monitor\n\n");
             printf("Usage: pinggraph.exe [options]\n\n");
             printf("Options:\n");
             printf("  --interval N   Ping every N seconds (default: 3)\n");
             printf("  --once         Run one single ping round and exit\n");
+            printf("  --hosts FILE   Load hosts from text file\n");
             printf("  --help, -h     Show this help message\n\n");
             exit(0);
         }
@@ -249,12 +286,19 @@ int main(int argc, char *argv[])
 {
     int interval = 0;
     int run_once = 0;
+    char *host_file = NULL;
 
-    parse_args(argc, argv, &interval, &run_once);
+    parse_args(argc, argv, &interval, &run_once, &host_file);
 
     char *hosts[MAX_HOSTS];
     latency_stat stats[MAX_HOSTS] = {0};
-    int host_count = read_hosts(hosts, MAX_HOSTS);
+    int host_count = 0;
+
+    if (host_file != NULL) {
+        host_count = load_hosts_from_file(host_file, hosts, MAX_HOSTS);
+    } else {
+        host_count = read_hosts_interactive(hosts, MAX_HOSTS);
+    }
 
     if (host_count <= 0) {
         return 1;
