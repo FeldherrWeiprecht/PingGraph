@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -12,6 +13,7 @@
 #define MAX_LENGTH 256
 #define MAX_BAR_WIDTH 50
 #define INTERVAL_SECONDS 3
+#define LOG_FILENAME "pinggraph.log"
 
 typedef struct
 {
@@ -146,7 +148,23 @@ void draw_bar(float latency, float max_latency)
     }
 }
 
-void ping_hosts(char *hosts[], int count, latency_stat stats[])
+void log_line(FILE *log_file, const char *host, float latency, latency_stat stat)
+{
+    time_t now = time(NULL);
+    struct tm *t = localtime(&now);
+    char timestamp[64];
+    strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", t);
+
+    if (latency >= 0.0) {
+        float avg = stat.sum / stat.count;
+        fprintf(log_file, "[%s] %s  %.2f ms  (min: %.2f  max: %.2f  avg: %.2f)\n",
+                timestamp, host, latency, stat.min, stat.max, avg);
+    } else {
+        fprintf(log_file, "[%s] %s  timeout\n", timestamp, host);
+    }
+}
+
+void ping_hosts(char *hosts[], int count, latency_stat stats[], FILE *log_file)
 {
     float latencies[MAX_HOSTS];
 
@@ -182,9 +200,12 @@ void ping_hosts(char *hosts[], int count, latency_stat stats[])
         }
 
         printf("\n");
+
+        log_line(log_file, hosts[i], latencies[i], stats[i]);
     }
 
     printf("\n");
+    fflush(log_file);
 }
 
 void wait_seconds(int seconds)
@@ -206,14 +227,22 @@ int main()
         return 1;
     }
 
+    FILE *log_file = fopen(LOG_FILENAME, "w");
+    if (log_file == NULL) {
+        printf("Failed to open log file.\n");
+        return 1;
+    }
+
     while (1) {
-        ping_hosts(hosts, host_count, stats);
+        ping_hosts(hosts, host_count, stats, log_file);
         wait_seconds(INTERVAL_SECONDS);
     }
 
     for (int i = 0; i < host_count; i++) {
         free(hosts[i]);
     }
+
+    fclose(log_file);
 
     return 0;
 }
