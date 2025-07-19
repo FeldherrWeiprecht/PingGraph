@@ -144,7 +144,7 @@ float get_max_latency(float *latencies, int count)
     return max;
 }
 
-void draw_bar(float latency, float max_latency)
+void draw_bar(float latency, float max_latency, int no_color)
 {
     int width = 0;
 
@@ -155,7 +155,7 @@ void draw_bar(float latency, float max_latency)
         }
     }
 
-    if (latency >= 0.0) {
+    if (!no_color && latency >= 0.0) {
         if (latency < 50.0) {
             printf("\033[32m");
         } else if (latency <= 150.0) {
@@ -173,7 +173,7 @@ void draw_bar(float latency, float max_latency)
         printf(" ");
     }
 
-    if (latency >= 0.0) {
+    if (!no_color && latency >= 0.0) {
         printf("\033[0m");
     }
 }
@@ -194,7 +194,7 @@ void log_line(FILE *log_file, const char *host, float latency, latency_stat stat
     }
 }
 
-void ping_hosts(char *hosts[], int count, latency_stat stats[], FILE *log_file)
+void ping_hosts(char *hosts[], int count, latency_stat stats[], FILE *log_file, int no_color)
 {
     float latencies[MAX_HOSTS];
 
@@ -222,7 +222,7 @@ void ping_hosts(char *hosts[], int count, latency_stat stats[], FILE *log_file)
     for (int i = 0; i < count; i++) {
         printf("%-20s ", hosts[i]);
 
-        draw_bar(latencies[i], max_latency);
+        draw_bar(latencies[i], max_latency, no_color);
 
         if (latencies[i] >= 0.0) {
             float avg = stats[i].sum / stats[i].count;
@@ -249,12 +249,13 @@ void wait_seconds(int seconds)
 #endif
 }
 
-int parse_args(int argc, char *argv[], int *interval, int *run_once, char **host_file, int *log_append)
+int parse_args(int argc, char *argv[], int *interval, int *run_once, char **host_file, int *log_append, int *no_color)
 {
     *interval = DEFAULT_INTERVAL;
     *run_once = 0;
     *host_file = NULL;
     *log_append = 0;
+    *no_color = 0;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--interval") == 0 && i + 1 < argc) {
@@ -270,6 +271,8 @@ int parse_args(int argc, char *argv[], int *interval, int *run_once, char **host
             i++;
         } else if (strcmp(argv[i], "--log-append") == 0) {
             *log_append = 1;
+        } else if (strcmp(argv[i], "--no-color") == 0) {
+            *no_color = 1;
         } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             printf("PingGraph - Network Latency Monitor\n\n");
             printf("Usage: pinggraph.exe [options]\n\n");
@@ -278,6 +281,7 @@ int parse_args(int argc, char *argv[], int *interval, int *run_once, char **host
             printf("  --once           Run one single ping round and exit\n");
             printf("  --hosts FILE     Load hosts from text file\n");
             printf("  --log-append     Append to existing log file instead of overwriting\n");
+            printf("  --no-color       Disable ANSI colored output\n");
             printf("  --help, -h       Show this help message\n\n");
             exit(0);
         }
@@ -291,9 +295,10 @@ int main(int argc, char *argv[])
     int interval = 0;
     int run_once = 0;
     int log_append = 0;
+    int no_color = 0;
     char *host_file = NULL;
 
-    parse_args(argc, argv, &interval, &run_once, &host_file, &log_append);
+    parse_args(argc, argv, &interval, &run_once, &host_file, &log_append, &no_color);
 
     char *hosts[MAX_HOSTS];
     latency_stat stats[MAX_HOSTS] = {0};
@@ -316,10 +321,10 @@ int main(int argc, char *argv[])
     }
 
     if (run_once) {
-        ping_hosts(hosts, host_count, stats, log_file);
+        ping_hosts(hosts, host_count, stats, log_file, no_color);
     } else {
         while (1) {
-            ping_hosts(hosts, host_count, stats, log_file);
+            ping_hosts(hosts, host_count, stats, log_file, no_color);
             wait_seconds(interval);
         }
     }
