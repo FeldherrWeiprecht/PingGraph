@@ -84,15 +84,27 @@ float get_ping_latency(const char *host)
     return latency;
 }
 
-void draw_bar(float latency)
+float get_max_latency(float *latencies, int count)
+{
+    float max = 0.0;
+
+    for (int i = 0; i < count; i++) {
+        if (latencies[i] > max) {
+            max = latencies[i];
+        }
+    }
+
+    return max;
+}
+
+void draw_bar(float latency, float max_latency)
 {
     int width = 0;
 
-    if (latency > 0.0) {
-        if (latency >= MAX_BAR_WIDTH) {
+    if (latency > 0.0 && max_latency > 0.0) {
+        width = (int)((latency / max_latency) * MAX_BAR_WIDTH);
+        if (width > MAX_BAR_WIDTH) {
             width = MAX_BAR_WIDTH;
-        } else {
-            width = (int)latency;
         }
     }
 
@@ -107,17 +119,23 @@ void draw_bar(float latency)
 
 void ping_hosts(char *hosts[], int count)
 {
+    float latencies[MAX_HOSTS];
+
+    for (int i = 0; i < count; i++) {
+        latencies[i] = get_ping_latency(hosts[i]);
+    }
+
+    float max_latency = get_max_latency(latencies, count);
+
     printf("\nPinging hosts:\n\n");
 
     for (int i = 0; i < count; i++) {
-        float latency = get_ping_latency(hosts[i]);
-
         printf("%-20s ", hosts[i]);
 
-        draw_bar(latency);
+        draw_bar(latencies[i], max_latency);
 
-        if (latency >= 0.0) {
-            printf("  %.2f ms", latency);
+        if (latencies[i] >= 0.0) {
+            printf("  %.2f ms", latencies[i]);
         } else {
             printf("  timeout");
         }
