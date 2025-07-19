@@ -108,12 +108,26 @@ void draw_bar(float latency, float max_latency)
         }
     }
 
+    if (latency >= 0.0) {
+        if (latency < 50.0) {
+            printf("\033[32m");
+        } else if (latency <= 150.0) {
+            printf("\033[33m");
+        } else {
+            printf("\033[31m");
+        }
+    }
+
     for (int i = 0; i < width; i++) {
         printf("#");
     }
 
     for (int i = width; i < MAX_BAR_WIDTH; i++) {
         printf(" ");
+    }
+
+    if (latency >= 0.0) {
+        printf("\033[0m");
     }
 }
 
