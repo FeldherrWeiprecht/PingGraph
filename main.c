@@ -13,6 +13,14 @@
 #define MAX_BAR_WIDTH 50
 #define INTERVAL_SECONDS 3
 
+typedef struct
+{
+    int count;
+    float sum;
+    float min;
+    float max;
+} latency_stat;
+
 int read_hosts(char *hosts[], int max_hosts)
 {
     int host_count = 0;
@@ -138,12 +146,23 @@ void draw_bar(float latency, float max_latency)
     }
 }
 
-void ping_hosts(char *hosts[], int count)
+void ping_hosts(char *hosts[], int count, latency_stat stats[])
 {
     float latencies[MAX_HOSTS];
 
     for (int i = 0; i < count; i++) {
         latencies[i] = get_ping_latency(hosts[i]);
+
+        if (latencies[i] >= 0.0) {
+            stats[i].sum += latencies[i];
+            stats[i].count += 1;
+            if (stats[i].count == 1 || latencies[i] < stats[i].min) {
+                stats[i].min = latencies[i];
+            }
+            if (latencies[i] > stats[i].max) {
+                stats[i].max = latencies[i];
+            }
+        }
     }
 
     float max_latency = get_max_latency(latencies, count);
@@ -156,7 +175,8 @@ void ping_hosts(char *hosts[], int count)
         draw_bar(latencies[i], max_latency);
 
         if (latencies[i] >= 0.0) {
-            printf("  %.2f ms", latencies[i]);
+            float avg = stats[i].sum / stats[i].count;
+            printf("  %.2f ms  (min: %.2f  max: %.2f  avg: %.2f)", latencies[i], stats[i].min, stats[i].max, avg);
         } else {
             printf("  timeout");
         }
@@ -179,6 +199,7 @@ void wait_seconds(int seconds)
 int main()
 {
     char *hosts[MAX_HOSTS];
+    latency_stat stats[MAX_HOSTS] = {0};
     int host_count = read_hosts(hosts, MAX_HOSTS);
 
     if (host_count <= 0) {
@@ -186,7 +207,7 @@ int main()
     }
 
     while (1) {
-        ping_hosts(hosts, host_count);
+        ping_hosts(hosts, host_count, stats);
         wait_seconds(INTERVAL_SECONDS);
     }
 
