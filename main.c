@@ -2,9 +2,16 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <unistd.h>
+#endif
+
 #define MAX_HOSTS 100
 #define MAX_LENGTH 256
 #define MAX_BAR_WIDTH 50
+#define INTERVAL_SECONDS 3
 
 int read_hosts(char *hosts[], int max_hosts)
 {
@@ -160,6 +167,15 @@ void ping_hosts(char *hosts[], int count)
     printf("\n");
 }
 
+void wait_seconds(int seconds)
+{
+#ifdef _WIN32
+    Sleep(seconds * 1000);
+#else
+    sleep(seconds);
+#endif
+}
+
 int main()
 {
     char *hosts[MAX_HOSTS];
@@ -169,7 +185,10 @@ int main()
         return 1;
     }
 
-    ping_hosts(hosts, host_count);
+    while (1) {
+        ping_hosts(hosts, host_count);
+        wait_seconds(INTERVAL_SECONDS);
+    }
 
     for (int i = 0; i < host_count; i++) {
         free(hosts[i]);
