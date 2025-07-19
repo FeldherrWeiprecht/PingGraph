@@ -190,7 +190,7 @@ void log_line(FILE *log_file, const char *host, float latency, latency_stat stat
         fprintf(log_file, "[%s] %s  %.2f ms  (min: %.2f  max: %.2f  avg: %.2f)\n",
                 timestamp, host, latency, stat.min, stat.max, avg);
     } else {
-        fprintf(log_file, "[%s] %s  timeout\n", timestamp, host);
+        fprintf(log_file, "[%s] %s  timeout (timeouts: %d)\n", timestamp, host, stat.timeout_count);
     }
 }
 
@@ -228,7 +228,7 @@ void ping_hosts(char *hosts[], int count, latency_stat stats[], FILE *log_file, 
             float avg = stats[i].sum / stats[i].count;
             printf("  %.2f ms  (min: %.2f  max: %.2f  avg: %.2f)", latencies[i], stats[i].min, stats[i].max, avg);
         } else {
-            printf("  timeout");
+            printf("  timeout (timeouts: %d)", stats[i].timeout_count);
         }
 
         printf("\n");
