@@ -15,8 +15,7 @@
 #define DEFAULT_INTERVAL 3
 #define LOG_FILENAME "pinggraph.log"
 
-typedef struct
-{
+typedef struct {
     int count;
     float sum;
     float min;
@@ -24,8 +23,7 @@ typedef struct
     int timeout_count;
 } latency_stat;
 
-int load_hosts_from_file(const char *filename, char *hosts[], int max_hosts)
-{
+int load_hosts_from_file(const char *filename, char *hosts[], int max_hosts) {
     FILE *file = fopen(filename, "r");
     if (file == NULL) {
         printf("Failed to open host file: %s\n", filename);
@@ -53,8 +51,7 @@ int load_hosts_from_file(const char *filename, char *hosts[], int max_hosts)
     return count;
 }
 
-int read_hosts_interactive(char *hosts[], int max_hosts)
-{
+int read_hosts_interactive(char *hosts[], int max_hosts) {
     int host_count = 0;
     char buffer[MAX_LENGTH];
 
@@ -89,8 +86,7 @@ int read_hosts_interactive(char *hosts[], int max_hosts)
     return host_count;
 }
 
-float get_ping_latency(const char *host)
-{
+float get_ping_latency(const char *host) {
     char command[MAX_LENGTH + 32];
 
 #ifdef _WIN32
@@ -131,21 +127,17 @@ float get_ping_latency(const char *host)
     return latency;
 }
 
-float get_max_latency(float *latencies, int count)
-{
+float get_max_latency(float *latencies, int count) {
     float max = 0.0;
-
     for (int i = 0; i < count; i++) {
         if (latencies[i] > max) {
             max = latencies[i];
         }
     }
-
     return max;
 }
 
-void draw_bar(float latency, float max_latency, int no_color)
-{
+void draw_bar(float latency, float max_latency, int no_color) {
     int width = 0;
 
     if (latency > 0.0 && max_latency > 0.0) {
@@ -178,8 +170,7 @@ void draw_bar(float latency, float max_latency, int no_color)
     }
 }
 
-void log_line(FILE *log_file, const char *host, float latency, latency_stat stat)
-{
+void log_line(FILE *log_file, const char *host, float latency, latency_stat stat) {
     time_t now = time(NULL);
     struct tm *t = localtime(&now);
     char timestamp[64];
@@ -194,8 +185,7 @@ void log_line(FILE *log_file, const char *host, float latency, latency_stat stat
     }
 }
 
-void print_json_output(char *hosts[], int count, latency_stat stats[], float *latencies)
-{
+void print_json_output(char *hosts[], int count, latency_stat stats[], float *latencies) {
     time_t now = time(NULL);
     struct tm *t = localtime(&now);
     char timestamp[64];
@@ -216,15 +206,27 @@ void print_json_output(char *hosts[], int count, latency_stat stats[], float *la
             printf("      \"latency_ms\": null,\n");
             printf("      \"timeouts\": %d\n", stats[i].timeout_count);
         }
-        if (i < count - 1)
-            printf("    },\n");
-        else
-            printf("    }\n");
+        printf(i < count - 1 ? "    },\n" : "    }\n");
     }
     printf("  ]\n}\n");
 }
 
-void ping_hosts(char *hosts[], int count, latency_stat stats[], FILE *log_file, int no_color, int json_mode)
+void print_summary(char *hosts[], int count, latency_stat stats[]) {
+    printf("\nSummary:\n\n");
+    printf("%-20s  %7s  %7s  %7s  %9s\n", "Host", "Min", "Max", "Avg", "Timeouts");
+    printf("-------------------------------------------------------------\n");
+
+    for (int i = 0; i < count; i++) {
+        float avg = stats[i].count > 0 ? stats[i].sum / stats[i].count : 0.0;
+        printf("%-20s  %7.2f  %7.2f  %7.2f  %9d\n", hosts[i],
+               stats[i].min, stats[i].max, avg, stats[i].timeout_count);
+    }
+
+    printf("\n");
+}
+
+void ping_hosts(char *hosts[], int count, latency_stat stats[], FILE *log_file,
+                int no_color, int json_mode)
 {
     float latencies[MAX_HOSTS];
 
@@ -274,8 +276,7 @@ void ping_hosts(char *hosts[], int count, latency_stat stats[], FILE *log_file, 
     fflush(log_file);
 }
 
-void wait_seconds(int seconds)
-{
+void wait_seconds(int seconds) {
 #ifdef _WIN32
     Sleep(seconds * 1000);
 #else
@@ -284,7 +285,7 @@ void wait_seconds(int seconds)
 }
 
 int parse_args(int argc, char *argv[], int *interval, int *run_once, char **host_file,
-               int *log_append, int *no_color, int *limit, int *json_mode)
+               int *log_append, int *no_color, int *limit, int *json_mode, int *summary_mode)
 {
     *interval = DEFAULT_INTERVAL;
     *run_once = 0;
@@ -293,6 +294,7 @@ int parse_args(int argc, char *argv[], int *interval, int *run_once, char **host
     *no_color = 0;
     *limit = -1;
     *json_mode = 0;
+    *summary_mode = 0;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--interval") == 0 && i + 1 < argc) {
@@ -309,6 +311,8 @@ int parse_args(int argc, char *argv[], int *interval, int *run_once, char **host
             *limit = atoi(argv[++i]);
         } else if (strcmp(argv[i], "--json") == 0) {
             *json_mode = 1;
+        } else if (strcmp(argv[i], "--summary") == 0) {
+            *summary_mode = 1;
         } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             printf("PingGraph - Network Latency Monitor\n\n");
             printf("Usage: pinggraph [options]\n\n");
@@ -320,6 +324,7 @@ int parse_args(int argc, char *argv[], int *interval, int *run_once, char **host
             printf("  --log-append     Append to existing log file\n");
             printf("  --no-color       Disable ANSI color output\n");
             printf("  --json           Output results in JSON format\n");
+            printf("  --summary        Show final summary after run\n");
             printf("  --help, -h       Show this help message\n\n");
             exit(0);
         }
@@ -330,10 +335,11 @@ int parse_args(int argc, char *argv[], int *interval, int *run_once, char **host
 
 int main(int argc, char *argv[])
 {
-    int interval, run_once, log_append, no_color, limit, json_mode;
+    int interval, run_once, log_append, no_color, limit, json_mode, summary_mode;
     char *host_file;
 
-    parse_args(argc, argv, &interval, &run_once, &host_file, &log_append, &no_color, &limit, &json_mode);
+    parse_args(argc, argv, &interval, &run_once, &host_file, &log_append,
+               &no_color, &limit, &json_mode, &summary_mode);
 
     char *hosts[MAX_HOSTS];
     latency_stat stats[MAX_HOSTS] = {0};
@@ -364,6 +370,10 @@ int main(int argc, char *argv[])
             wait_seconds(interval);
             rounds++;
         }
+    }
+
+    if (summary_mode && !json_mode) {
+        print_summary(hosts, host_count, stats);
     }
 
     for (int i = 0; i < host_count; i++) {
