@@ -249,13 +249,14 @@ void wait_seconds(int seconds)
 #endif
 }
 
-int parse_args(int argc, char *argv[], int *interval, int *run_once, char **host_file, int *log_append, int *no_color)
+int parse_args(int argc, char *argv[], int *interval, int *run_once, char **host_file, int *log_append, int *no_color, int *limit)
 {
     *interval = DEFAULT_INTERVAL;
     *run_once = 0;
     *host_file = NULL;
     *log_append = 0;
     *no_color = 0;
+    *limit = 0;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--interval") == 0 && i + 1 < argc) {
@@ -273,12 +274,16 @@ int parse_args(int argc, char *argv[], int *interval, int *run_once, char **host
             *log_append = 1;
         } else if (strcmp(argv[i], "--no-color") == 0) {
             *no_color = 1;
+        } else if (strcmp(argv[i], "--limit") == 0 && i + 1 < argc) {
+            *limit = atoi(argv[i + 1]);
+            i++;
         } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             printf("PingGraph - Network Latency Monitor\n\n");
             printf("Usage: pinggraph.exe [options]\n\n");
             printf("Options:\n");
             printf("  --interval N     Ping every N seconds (default: 3)\n");
             printf("  --once           Run one single ping round and exit\n");
+            printf("  --limit N        Stop after N ping rounds\n");
             printf("  --hosts FILE     Load hosts from text file\n");
             printf("  --log-append     Append to existing log file instead of overwriting\n");
             printf("  --no-color       Disable ANSI colored output\n");
@@ -296,9 +301,10 @@ int main(int argc, char *argv[])
     int run_once = 0;
     int log_append = 0;
     int no_color = 0;
+    int limit = 0;
     char *host_file = NULL;
 
-    parse_args(argc, argv, &interval, &run_once, &host_file, &log_append, &no_color);
+    parse_args(argc, argv, &interval, &run_once, &host_file, &log_append, &no_color, &limit);
 
     char *hosts[MAX_HOSTS];
     latency_stat stats[MAX_HOSTS] = {0};
@@ -322,6 +328,13 @@ int main(int argc, char *argv[])
 
     if (run_once) {
         ping_hosts(hosts, host_count, stats, log_file, no_color);
+    } else if (limit > 0) {
+        for (int round = 0; round < limit; round++) {
+            ping_hosts(hosts, host_count, stats, log_file, no_color);
+            if (round < limit - 1) {
+                wait_seconds(interval);
+            }
+        }
     } else {
         while (1) {
             ping_hosts(hosts, host_count, stats, log_file, no_color);
@@ -334,6 +347,5 @@ int main(int argc, char *argv[])
     }
 
     fclose(log_file);
-
     return 0;
 }
